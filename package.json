@@ -1,0 +1,19 @@
+{
+  "name": "boilerbot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "dependencies": {
+    "dotenv": "^2.0.0",
+    "fs": "0.0.2",
+    "slack": "^7.5.4",
+    "slackbotapi": "^1.3.9",
+    "sqlite3": "^3.1.4"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
