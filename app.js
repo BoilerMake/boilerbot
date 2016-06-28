@@ -111,12 +111,11 @@ slack.on('message', function (data) {
      						+ text[3] + "'";
      			db.all(stmt, function(err, rows) {
      				if(rows && rows.length > 0) {
-						var list = "*" + text[3] + "* is part of:\n";
+						var list = "*" + text[3] + "* is in ";
         				rows.forEach(function (row) {
-        					console.log(row);
-        					list += row.name + "\n"; 
+        					list += row.name + ", "; 
         				});
-        				slack.sendMsg(data.channel, list);
+        				slack.sendMsg(data.channel, list.slice(0, -2));
      				}
      				else {
      					slack.sendMsg(data.channel, "This user doesn\'t exist or is not in any groups.");
@@ -181,7 +180,6 @@ slack.on('message', function (data) {
         var command = data.text.substring(1).split(' ');        
 		var stmt = "SELECT members.username, groups.id " +
 			"FROM members JOIN groups ON members.groupid = groups.id WHERE groups.name='"+command[0].toLowerCase() + "'";
-        console.log(stmt);
         db.all(stmt, function(err, rows){
         	if(rows && rows.length > 0) {
                 console.log(rows);
@@ -192,7 +190,7 @@ slack.on('message', function (data) {
                         mentions += "@" + row.username;
                         first = 0;
                     } else {    
-                        mentions += " @"+row.username; 
+                        mentions += ", @"+row.username; 
                     }
         		});
         		slack.sendMsg(data.channel, mentions);
