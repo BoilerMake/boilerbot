@@ -178,14 +178,22 @@ slack.on('message', function (data) {
     	}
 	}
     else if (data.text.charAt(0) === '@') {
-        var command = data.text.substring(1).split(' ');
+        var command = data.text.substring(1).split(' ');        
 		var stmt = "SELECT members.username, groups.id " +
 			"FROM members JOIN groups ON members.groupid = groups.id WHERE groups.name='"+command[0].toLowerCase() + "'";
+        console.log(stmt);
         db.all(stmt, function(err, rows){
-        	if(rows) {
-        		var mentions = "";
+        	if(rows && rows.length > 0) {
+                console.log(rows);
+        		var mentions = "*@" + command[0].toLowerCase() + ":* ";
+                var first = 1;
         		rows.forEach(function (row) {
-        			mentions += "@"+row.username+" "; 
+                    if(first) {
+                        mentions += "@" + row.username;
+                        first = 0;
+                    } else {    
+                        mentions += " @"+row.username; 
+                    }
         		});
         		slack.sendMsg(data.channel, mentions);
         	}
