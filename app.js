@@ -40,8 +40,8 @@ slack.on('message', function (data) {
     if (typeof data.text === 'undefined') return;
 
     var text = data.text.split(' ');
-    if(text[0] === process.env.BOT_NAME) {
-    	if(text[1] === 'group') {
+    if(text[0] === process.env.BOT_NAME || text[0] === process.env.BOT_NAME_SHORT) {
+    	if(text[1] === 'group' || text[1] === 'g') {
     		if(text[2] === 'list') {
     			var i = 1;
     			db.each("SELECT * FROM groups", function(err, row) {
@@ -173,7 +173,7 @@ slack.on('message', function (data) {
         		});
     		}
     		else if(text[2] === 'help') {
-    			var helptext = "All commands begin with `boilerbot group`\n" + 
+    			var helptext = "All commands begin with `" + process.env.BOT_NAME + " OR " + process.env.BOT_NAME_SHORT + " group`\n" + 
     							"`list` - list all groups\n" + 
     							"`create <group>` - create a new group\n" + 
     							"`destroy <group>` - destroy group and remove user memberships\n" + 
@@ -185,7 +185,7 @@ slack.on('message', function (data) {
     			slack.sendMsg(data.channel, helptext); 
     		}
     	}
-        else if(text[1] === 'task') {
+        else if(text[1] === 'task' || text[1] === 't') {
             if(text[2] !== undefined && text[3] === "list") {
                 db.each("SELECT task.id, task.text, task.assigned_to, task.status FROM task JOIN groups ON task.groupid = groups.id WHERE groups.name='"+text[2]+"'", function(err, row) {
                     if(row.assigned_to != null) {
@@ -267,7 +267,7 @@ slack.on('message', function (data) {
                 }); 
             }
             else if(text[2] === "help") {
-               var helptext = "All commands begin with `boilerbot task`\n" + 
+               var helptext = "All commands begin with `" + process.env.BOT_NAME + " OR " + process.env.BOT_NAME_SHORT +" task`\n" + 
                                 "`<group> list` - list tasks for <group>\n" + 
                                 "`<group> add` - create a task item for <group>\n" + 
                                 "`<group> done <taskid>` - Mark task with <taskid> as completed\n" + 
@@ -276,6 +276,12 @@ slack.on('message', function (data) {
                                 "`<group> delete <taskid>` - Delete task with <taskid>\n";
                 slack.sendMsg(data.channel, helptext);  
             }
+        }
+        else if(text[1] === 'help') {
+            var helptext = "All commands begin with `" + process.env.BOT_NAME + " or " + process.env.BOT_NAME_SHORT +"`\n" + 
+                        "`group help` - list group help\n" + 
+                        "`task help` - list task help\n";
+            slack.sendMsg(data.channel, helptext); 
         }
 	}
     else if (data.text.charAt(0) === '@') {
