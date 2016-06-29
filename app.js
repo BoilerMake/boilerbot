@@ -5,6 +5,7 @@ var file = "local.db";
 var exists = fs.existsSync(file);
 var db = new sqlite3.Database('local.db');
 var slackAPI = require('slackbotapi');
+var request = require('superagent');
 var slack = new slackAPI({
     'token': process.env.SLACK_TOKEN,
     'logging': true,
@@ -20,6 +21,15 @@ function formatCompletion(i) {
     else {
         return "uncompleted";
     }
+}
+function formatStatus(s) {
+    if(s === "Up") {
+        return ":large_blue_circle:";
+    }
+    else if(s === "Down") {
+        return ":red_circle:";
+    }
+    return ":question:";
 }
 db.serialize(function() {
 	if(!exists) {
@@ -276,6 +286,25 @@ slack.on('message', function (data) {
                                 "`<group> delete <taskid>` - Delete task with <taskid>\n";
                 slack.sendMsg(data.channel, helptext);  
             }
+        }
+        else if(text[1] === 'status') {
+             request
+                .get('https://www.statuscake.com/API/Tests/')
+                .set('API', process.env.STATUS_CAKE_API)
+                .set('Username', process.env.STATUS_CAKE_USER)
+                .end( function(err, res){
+                    if(err) {
+
+                    }
+                    if(res) {
+                        var str = "";
+                        res.body.forEach(function(entry) {
+                            str += formatStatus(entry.Status) + " *" + entry.WebsiteName + "*  uptime: " + entry.Uptime + "%\n";
+                            console.log(entry.TestID);
+                        });
+                        slack.sendMsg(data.channel, str);
+                    }
+                });
         }
         else if(text[1] === 'help') {
             var helptext = "All commands begin with `" + process.env.BOT_NAME + " or " + process.env.BOT_NAME_SHORT +"`\n" + 
