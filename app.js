@@ -220,6 +220,10 @@ slack.on('message', function (data) {
                             str += text[i] + " ";
                         }
                         db.prepare("INSERT INTO task (groupid, text, status) VALUES (?, ?, 0)").run(row.id, str.slice(0, -1)).finalize();
+                        slack.sendMsg(data.channel, 'Task added.');
+                    }
+                    else {
+                        slack.sendMsg(data.channel, 'Couldn\'t find group.');
                     }
                 });
             }
