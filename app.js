@@ -271,8 +271,8 @@ slack.on('message', function (data) {
                                 "`<group> list` - list tasks for <group>\n" + 
                                 "`<group> add` - create a task item for <group>\n" + 
                                 "`<group> done <taskid>` - Mark task with <taskid> as completed\n" + 
-                                "`<group> assign <name> <taskid>` - Assign a task with <taskid> to <name>\n" + 
-                                "`<group> unassign <taskid>` - Remove name from task with <taskid>\n";
+                                "`<group> assign <taskid> <name>` - Assign a task with <taskid> to <name>\n" + 
+                                "`<group> unassign <taskid>` - Remove name from task with <taskid>\n" +
                                 "`<group> delete <taskid>` - Delete task with <taskid>\n";
                 slack.sendMsg(data.channel, helptext);  
             }
