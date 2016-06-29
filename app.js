@@ -10,7 +10,17 @@ var slack = new slackAPI({
     'logging': true,
     'autoReconnect': true
 });
-
+function isNumeric(n) {
+  return !isNaN(parseFloat(n)) && isFinite(n);
+}
+function formatCompletion(i) {
+    if(i) {
+        return ":ballot_box_with_check:";
+    }
+    else {
+        return "uncompleted";
+    }
+}
 db.serialize(function() {
 	if(!exists) {
 		var group_arr = ["dev", "sponsorship"];
@@ -30,7 +40,7 @@ slack.on('message', function (data) {
     if (typeof data.text === 'undefined') return;
 
     var text = data.text.split(' ');
-    if(text[0] === 'boilerbot') {
+    if(text[0] === process.env.BOT_NAME) {
     	if(text[1] === 'group') {
     		if(text[2] === 'list') {
     			var i = 1;
@@ -175,6 +185,94 @@ slack.on('message', function (data) {
     			slack.sendMsg(data.channel, helptext); 
     		}
     	}
+        else if(text[1] === 'task') {
+            if(text[2] !== undefined && text[3] === "list") {
+                db.each("SELECT task.id, task.text, task.assigned_to, task.status FROM task JOIN groups ON task.groupid = groups.id WHERE groups.name='"+text[2]+"'", function(err, row) {
+                    if(row.assigned_to != null) {
+                        slack.sendMsg(data.channel, '#' + row.id + ' ' + row.text + " (*@" + row.assigned_to + "* | " + formatCompletion(row.status) + ")");
+                    }
+                    else {
+                        slack.sendMsg(data.channel, '#' + row.id + ' ' + row.text + " (*unassigned* | " + formatCompletion(row.status) + ")");
+                    }
+                });
+            }
+            else if(text[2] !== undefined && text[3] === "done" && isNumeric(text[4])) {
+                var stmt = "SELECT task.id AS taskid, task.text, task.assigned_to, task.status FROM task JOIN groups ON task.groupid = groups.id " +
+                            "WHERE groups.name='" + text[2] + "' AND task.id='" + text[4] + "'";
+                db.get(stmt, function(err, row) {
+                    if(typeof row !== "undefined") {
+                        if(row.status == 0) {
+                            db.run("UPDATE task SET status=1 WHERE id='" + text[4] + "'");
+                            slack.sendMsg(data.channel, 'Task #' + row.taskid + " has been completed.");
+                        }
+                        else {
+                            slack.sendMsg(data.channel, 'This task has already been completed.');
+                        }
+                    }
+                });
+            }
+            else if(text[2] !== undefined && text[3] === "add" && text[4] !== undefined) {
+                var stmt = "SELECT * FROM groups WHERE groups.name='"+text[2]+"'";
+                 db.get(stmt, function(err, row) {
+                    if(typeof row !== "undefined") {
+                        var str = "";
+                        for(var i = 4; i < text.length; i++) {
+                            str += text[i] + " ";
+                        }
+                        db.prepare("INSERT INTO task (groupid, text, status) VALUES (?, ?, 0)").run(row.id, str.slice(0, -1)).finalize();
+                    }
+                });
+            }
+            else if(text[2] !== undefined && text[3] === "assign" && isNumeric(text[4]) && text[5] !== undefined) {
+                var stmt = "SELECT task.id AS taskid, task.text, task.assigned_to, task.status FROM task JOIN groups ON task.groupid = groups.id " +
+                            "WHERE groups.name='" + text[2] + "' AND task.id='" + text[4] + "'";
+                db.get(stmt, function(err, row) {
+                    if(typeof row !== "undefined") {
+                        db.run("UPDATE task SET assigned_to='" + text[5] + "' WHERE id='" + text[4] + "'");
+                        slack.sendMsg(data.channel, 'Task #' + row.taskid + " has been assigned to *@" + text[5] + "*");
+                    }
+                    else {
+                        slack.sendMsg(data.channel, 'This task could not be found.');
+                    }
+                }); 
+            }
+            else if(text[2] !== undefined && text[3] === "unassign" && isNumeric(text[4])) {
+                var stmt = "SELECT task.id AS taskid, task.text, task.assigned_to, task.status FROM task JOIN groups ON task.groupid = groups.id " +
+                            "WHERE groups.name='" + text[2] + "' AND task.id='" + text[4] + "'";
+                db.get(stmt, function(err, row) {
+                    if(typeof row !== "undefined") {
+                        db.run("UPDATE task SET assigned_to=NULL WHERE id='" + text[4] + "'");
+                        slack.sendMsg(data.channel, 'Task #' + row.taskid + " has been unassigned");
+                    }
+                    else {
+                        slack.sendMsg(data.channel, 'This task could not be found.');
+                    }
+                }); 
+            }
+            else if(text[2] !== undefined && text[3] === "delete" && isNumeric(text[4])) {
+                var stmt = "SELECT task.id AS taskid, task.text, task.assigned_to, task.status FROM task JOIN groups ON task.groupid = groups.id " +
+                            "WHERE groups.name='" + text[2] + "' AND task.id='" + text[4] + "'";
+                db.get(stmt, function(err, row) {
+                    if(typeof row !== "undefined") {
+                        db.run("DELETE FROM task WHERE id='" + text[4] + "'");
+                        slack.sendMsg(data.channel, 'Task #' + row.taskid + " has been deleted");
+                    }
+                    else {
+                        slack.sendMsg(data.channel, 'This task could not be found.');
+                    }
+                }); 
+            }
+            else if(text[2] === "help") {
+               var helptext = "All commands begin with `boilerbot task`\n" + 
+                                "`<group> list` - list tasks for <group>\n" + 
+                                "`<group> add` - create a task item for <group>\n" + 
+                                "`<group> done <taskid>` - Mark task with <taskid> as completed\n" + 
+                                "`<group> assign <name> <taskid>` - Assign a task with <taskid> to <name>\n" + 
+                                "`<group> unassign <taskid>` - Remove name from task with <taskid>\n";
+                                "`<group> delete <taskid>` - Delete task with <taskid>\n";
+                slack.sendMsg(data.channel, helptext);  
+            }
+        }
 	}
     else if (data.text.charAt(0) === '@') {
         var command = data.text.substring(1).split(' ');        
