@@ -6,11 +6,13 @@ var exists = fs.existsSync(file);
 var db = new sqlite3.Database('local.db');
 var slackAPI = require('slackbotapi');
 var request = require('superagent');
+var moment = require('moment');
 var slack = new slackAPI({
     'token': process.env.SLACK_TOKEN,
     'logging': true,
     'autoReconnect': true
 });
+
 function isNumeric(n) {
   return !isNaN(parseFloat(n)) && isFinite(n);
 }
@@ -198,13 +200,19 @@ slack.on('message', function (data) {
     	}
         else if(text[1] === 'task' || text[1] === 't') {
             if(text[2] !== undefined && text[3] === "list") {
-                db.each("SELECT task.id, task.text, task.assigned_to, task.status FROM task JOIN groups ON task.groupid = groups.id WHERE groups.name='"+text[2]+"'", function(err, row) {
+                db.each("SELECT task.id, task.text, task.assigned_to, task.status, task.deadline FROM task JOIN groups ON task.groupid = groups.id WHERE groups.name='"+text[2]+"'", function(err, row) {
+                    var str = '#' + row.id + ' ' + row.text + ' (';
                     if(row.assigned_to != null) {
-                        slack.sendMsg(data.channel, '#' + row.id + ' ' + row.text + " (*@" + row.assigned_to + "* | " + formatCompletion(row.status) + ")");
+                       str += '*@' + row.assigned_to + '*';
                     }
                     else {
-                        slack.sendMsg(data.channel, '#' + row.id + ' ' + row.text + " (*unassigned* | " + formatCompletion(row.status) + ")");
+                        str += '*unassigned*';
                     }
+                    if(row.deadline != null) {
+                        str += ' | ' + row.deadline;
+                    }
+                    str+= ' | ' + formatCompletion(row.status) + ')';
+                     slack.sendMsg(data.channel, str);
                 });
             }
             else if(text[2] !== undefined && text[3] === "done" && isNumeric(text[4])) {
@@ -277,6 +285,26 @@ slack.on('message', function (data) {
                     }
                 }); 
             }
+            else if(text[2] !== undefined && text[3] === "date" && isNumeric(text[4]) && text[5] !== undefined) {
+                console.log("here");
+                var stmt = "SELECT task.id AS taskid, task.text, task.assigned_to, task.status FROM task JOIN groups ON task.groupid = groups.id " +
+                            "WHERE groups.name='" + text[2] + "' AND task.id='" + text[4] + "'";
+                console.log(stmt);
+                db.get(stmt, function(err, row) {
+                    if(typeof row !== "undefined") {
+                        if(moment(text[5], "MM/DD/YYYY", true).isValid()) {
+                            db.run("UPDATE task SET deadline='" + text[5] +"' WHERE id='" + text[4] + "'");
+                            slack.sendMsg(data.channel, 'Task #' + row.taskid + " now has deadline *" + text[5] + "*");
+                        }
+                        else {
+                            slack.sendMsg(data.channel, 'Bad date format');
+                        }
+                    }
+                    else {
+                        slack.sendMsg(data.channel, 'This task could not be found.');
+                    }
+                }); 
+            }
             else if(text[2] === "help") {
                var helptext = "All commands begin with `" + process.env.BOT_NAME + " OR " + process.env.BOT_NAME_SHORT +" task`\n" + 
                                 "`<group> list` - list tasks for <group>\n" + 
@@ -284,6 +312,7 @@ slack.on('message', function (data) {
                                 "`<group> done <taskid>` - Mark task with <taskid> as completed\n" + 
                                 "`<group> assign <taskid> <name>` - Assign a task with <taskid> to <name>\n" + 
                                 "`<group> unassign <taskid>` - Remove name from task with <taskid>\n" +
+                                "`<group> date <taskid> <MM/DD/YYYY>` - Add deadline on <MM/DD/YYYY> to task <taskid>\n" +
                                 "`<group> delete <taskid>` - Delete task with <taskid>\n";
                 slack.sendMsg(data.channel, helptext);  
             }
