@@ -200,7 +200,13 @@ slack.on('message', function (data) {
     	}
         else if(text[1] === 'task' || text[1] === 't') {
             if(text[2] !== undefined && text[3] === "list") {
-                db.each("SELECT task.id, task.text, task.assigned_to, task.status, task.deadline FROM task JOIN groups ON task.groupid = groups.id WHERE groups.name='"+text[2]+"'", function(err, row) {
+                if(text[4] !== undefined && text[4] === 'all') {
+                    var stmt = "SELECT task.id, task.text, task.assigned_to, task.status, task.deadline FROM task JOIN groups ON task.groupid = groups.id WHERE groups.name='"+text[2]+"'";
+                }
+                else {
+                    var stmt = "SELECT task.id, task.text, task.assigned_to, task.status, task.deadline FROM task JOIN groups ON task.groupid = groups.id WHERE groups.name='"+text[2]+"' AND status = 0";
+                }
+                db.each(stmt, function(err, row) {
                     var str = '#' + row.id + ' ' + row.text + ' (';
                     if(row.assigned_to != null) {
                        str += '*@' + row.assigned_to + '*';
@@ -307,7 +313,8 @@ slack.on('message', function (data) {
             }
             else if(text[2] === "help") {
                var helptext = "All commands begin with `" + process.env.BOT_NAME + " OR " + process.env.BOT_NAME_SHORT +" task`\n" + 
-                                "`<group> list` - list tasks for <group>\n" + 
+                                "`<group> list` - list uncompleted tasks for <group>\n" +
+                                "`<group> list all` - list all tasks for <group>\n" +
                                 "`<group> add` - create a task item for <group>\n" + 
                                 "`<group> done <taskid>` - Mark task with <taskid> as completed\n" + 
                                 "`<group> assign <taskid> <name>` - Assign a task with <taskid> to <name>\n" + 
