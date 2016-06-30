@@ -35,7 +35,8 @@ db.serialize(function() {
 	if(!exists) {
 		var group_arr = ["dev", "sponsorship"];
 		db.run("CREATE TABLE groups (id	INTEGER PRIMARY KEY AUTOINCREMENT, name	TEXT)");
-		db.run("CREATE TABLE members (groupid INTEGER, username	TEXT)");
+        db.run("CREATE TABLE members (groupid INTEGER, username TEXT)");
+		db.run("CREATE TABLE IF NOT EXISTS task (id integer PRIMARY KEY AUTOINCREMENT, groupid integer, \"text\" text, assigned_to text, status integer, deadline text(128));");
 		db.run("BEGIN TRANSACTION");
 		group_arr.forEach(function(group) {
 			db.run("INSERT INTO groups (name) VALUES (?)", [group]);
