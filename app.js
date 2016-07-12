@@ -13,9 +13,11 @@ var slack = new slackAPI({
     'autoReconnect': true
 });
 
+// Helper functions
 function isNumeric(n) {
   return !isNaN(parseFloat(n)) && isFinite(n);
 }
+
 function formatCompletion(i) {
     if(i) {
         return ":ballot_box_with_check:";
@@ -24,6 +26,7 @@ function formatCompletion(i) {
         return "uncompleted";
     }
 }
+
 function formatStatus(s) {
     if(s === "Up") {
         return ":large_blue_circle:";
@@ -33,7 +36,9 @@ function formatStatus(s) {
     }
     return ":question:";
 }
+
 db.serialize(function() {
+    // If the local.dn file doesn't exist, run migrations
 	if(!exists) {
 		var group_arr = ["dev", "sponsorship"];
 		db.run("CREATE TABLE groups (id	INTEGER PRIMARY KEY AUTOINCREMENT, name	TEXT)");
@@ -47,7 +52,7 @@ db.serialize(function() {
 	}
 });
 
-// Slack on EVENT message, send data.
+// On message received
 slack.on('message', function (data) {
     // If no text, return.
     if (typeof data.text === 'undefined') return;
@@ -361,10 +366,10 @@ slack.on('message', function (data) {
                 var first = 1;
         		rows.forEach(function (row) {
                     if(first) {
-                        mentions += "@" + row.username;
+                        mentions += "<@" + row.username + ">";
                         first = 0;
                     } else {    
-                        mentions += ", @"+row.username; 
+                        mentions += ", <@"+row.username + ">"; 
                     }
         		});
         		slack.sendMsg(data.channel, mentions);
