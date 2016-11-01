@@ -38,7 +38,7 @@ function formatStatus(s) {
 }
 
 db.serialize(function() {
-    // If the local.dn file doesn't exist, run migrations
+    // If the local.db file doesn't exist, run migrations
 	if(!exists) {
 		var group_arr = ["dev", "sponsorship"];
 		db.run("CREATE TABLE groups (id	INTEGER PRIMARY KEY AUTOINCREMENT, name	TEXT)");
