@@ -355,14 +355,17 @@ slack.on('message', function (data) {
             slack.sendMsg(data.channel, helptext); 
         }
 	}
-    else if (data.text.charAt(0) === '@') {
-        var command = data.text.substring(1).split(' ');        
+    else if (data.text.match(/@\w+/g)) {
+    	var matches = data.text.match(/@\w+/g);
+    	matches.forEach(function(group) {
+       var group = group.substring(1);
+       console.log(group)
 		var stmt = "SELECT members.username, groups.id " +
-			"FROM members JOIN groups ON members.groupid = groups.id WHERE groups.name='"+command[0].toLowerCase() + "'";
+			"FROM members JOIN groups ON members.groupid = groups.id WHERE groups.name='"+group.toLowerCase() + "'";
         db.all(stmt, function(err, rows){
         	if(rows && rows.length > 0) {
                 console.log(rows);
-        		var mentions = "*@" + command[0].toLowerCase() + ":* ";
+        		var mentions = "*@" + group.toLowerCase() + ":* ";
                 var first = 1;
         		rows.forEach(function (row) {
                     if(first) {
@@ -375,6 +378,8 @@ slack.on('message', function (data) {
         		slack.sendMsg(data.channel, mentions);
         	}
         });
+    		// console.log(element);
+		});
     }
 });
 
