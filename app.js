@@ -407,7 +407,7 @@ slack.on('message', function (data) {
     } else if(text == "<!channel>") {
 		var stmt = "SELECT * FROM whitelist WHERE channel='"+data['channel']+"'";
 		db.get(stmt, function(err, row) {
-			if(typeof row !== "undefined") {
+			if(typeof row == "undefined") {
 				slack.sendMsg(data.channel, 'Please use group mentioning instead, `bb group list`');
 			}
 		});
