@@ -43,6 +43,7 @@ db.serialize(function() {
 		var group_arr = ["dev", "sponsorship"];
 		db.run("CREATE TABLE groups (id	INTEGER PRIMARY KEY AUTOINCREMENT, name	TEXT)");
         db.run("CREATE TABLE members (groupid INTEGER, username TEXT)");
+        db.run("CREATE TABLE whitelist (channel TEXT)");
 		db.run("CREATE TABLE IF NOT EXISTS task (id integer PRIMARY KEY AUTOINCREMENT, groupid integer, \"text\" text, assigned_to text, status integer, deadline text(128));");
 		db.run("BEGIN TRANSACTION");
 		group_arr.forEach(function(group) {
@@ -58,6 +59,7 @@ slack.on('message', function (data) {
     if (typeof data.text === 'undefined') return;
 
     var text = data.text.split(' ');
+    console.log(text);
     if(text[0] === process.env.BOT_NAME || text[0] === process.env.BOT_NAME_SHORT) {
     	if(text[1] === 'group' || text[1] === 'g') {
     		if(text[2] === 'list') {
@@ -354,12 +356,34 @@ slack.on('message', function (data) {
                         "`task help` - list task help\n";
             slack.sendMsg(data.channel, helptext); 
         }
+        else if(text[1] === 'whitelist') {
+        	if(text[2] === 'add') {
+   				var stmt = "SELECT * FROM whitelist WHERE channel='"+data['channel']+"'";
+        		db.get(stmt, function(err, row) {
+            		if(typeof row == "undefined") {
+                    	db.prepare("INSERT INTO whitelist (channel) VALUES (?)").run(data['channel']).finalize();
+                    	 slack.sendMsg(data.channel, 'Whitelisted channel');
+           			} else {
+           				slack.sendMsg(data.channel, 'Already whitelisted');
+            		}
+        		});
+        	} else if(text[2] === 'remove') {
+ 				var stmt = "SELECT * FROM whitelist WHERE channel='"+data['channel']+"'";
+        		db.get(stmt, function(err, row) {
+            		if(typeof row !== "undefined") {
+                    	db.run("DELETE FROM whitelist WHERE channel='" + data['channel'] + "'");
+                    	 slack.sendMsg(data.channel, 'Removed channel from whitelist');
+           			} else {
+           				slack.sendMsg(data.channel, 'Channel not whitelisted');
+            		}
+        		});
+        	}
+        }
 	}
     else if (data.text.match(/@\w+/g)) {
     	var matches = data.text.match(/@\w+/g);
     	matches.forEach(function(group) {
        var group = group.substring(1);
-       console.log(group)
 		var stmt = "SELECT members.username, groups.id " +
 			"FROM members JOIN groups ON members.groupid = groups.id WHERE groups.name='"+group.toLowerCase() + "'";
         db.all(stmt, function(err, rows){
@@ -379,6 +403,13 @@ slack.on('message', function (data) {
         	}
         });
     		// console.log(element);
+		});
+    } else if(text == "<!channel>") {
+		var stmt = "SELECT * FROM whitelist WHERE channel='"+data['channel']+"'";
+		db.get(stmt, function(err, row) {
+			if(typeof row !== "undefined") {
+				slack.sendMsg(data.channel, 'Please use group mentioning instead, `bb group list`');
+			}
 		});
     }
 });
