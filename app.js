@@ -404,7 +404,7 @@ slack.on('message', function (data) {
         });
     		// console.log(element);
 		});
-    } else if(text == "<!channel>") {
+    } else if(text.includes("<!channel>")) {
 		var stmt = "SELECT * FROM whitelist WHERE channel='"+data['channel']+"'";
 		db.get(stmt, function(err, row) {
 			if(typeof row == "undefined") {
