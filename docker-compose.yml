@@ -1,0 +1,5 @@
+web:
+  restart: always
+  build: .
+  volumes:
+    - "./dockerdbdata:/usr/src/app/data"
