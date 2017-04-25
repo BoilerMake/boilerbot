@@ -1,9 +1,9 @@
 require('dotenv').config();
 var sqlite3 = require('sqlite3').verbose();
 var fs = require("fs");
-var file = "local.db";
+var file = "data/local.db";
 var exists = fs.existsSync(file);
-var db = new sqlite3.Database('local.db');
+var db = new sqlite3.Database('data/local.db');
 var slackAPI = require('slackbotapi');
 var request = require('superagent');
 var moment = require('moment');
