@@ -1,5 +1,7 @@
 web:
   restart: always
   build: .
+  environment:
+    - "TZ=America/New_York"
   volumes:
     - "./dockerdbdata:/usr/src/app/data"
