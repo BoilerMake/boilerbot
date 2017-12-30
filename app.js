@@ -10,7 +10,8 @@ var moment = require('moment');
 var slack = new slackAPI({
     'token': process.env.SLACK_TOKEN,
     'logging': true,
-    'autoReconnect': true
+    'autoReconnect': true,
+	'link_names': true
 });
 
 // Helper functions
