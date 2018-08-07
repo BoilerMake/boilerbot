@@ -382,7 +382,7 @@ slack.on('message', function (data) {
   }
   // Team tagged, ex. @comm or @ux
   else if (data.text.match(/@\w+/g)) {
-    if (process.env.GROUP_MENTIONING_FLAG) {
+    if (process.env.GROUP_MENTIONING_FLAG == 1) {
       var matches = data.text.match(/@\w+/g);
       matches.forEach(function (group) {
         var group = group.substring(1);
