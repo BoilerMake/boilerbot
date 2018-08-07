@@ -381,50 +381,52 @@ slack.on('message', function (data) {
     }
   }
   // Team tagged, ex. @comm or @ux
-  /* else if (data.text.match(/@\w+/g)) {
-    var matches = data.text.match(/@\w+/g);
-    matches.forEach(function (group) {
-      var group = group.substring(1);
-      var stmt = "SELECT members.username, groups.id " +
-        "FROM members JOIN groups ON members.groupid = groups.id WHERE groups.name='" + group.toLowerCase() + "'";
-      db.all(stmt, function (err, rows) {
-        if (rows && rows.length > 0) {
-          console.log(rows);
-          var mentions = "*@" + group.toLowerCase() + ":* ";
-          var first = 1;
-          // Slack requires tagging by user ID
-          // this returns appropriate user ID for each display name
-          request
-            .get('https://slack.com/api/users.list?token=' + process.env.SLACK_TOKEN + '&pretty=1')
-            .then(function (res) {
-              var response = res.body['members'];
-              responseLen = Object.keys(response).length;
-              rows.forEach(function (row) {
-                var needle = row.username;
-                if (first) {
-                  for (var i = 0; i < responseLen; i++) {
-                    if (response[i]['profile']['display_name'] === needle) {
-                      mentions += "<@" + response[i]['id'] + ">";
-                      break;
+  else if (data.text.match(/@\w+/g)) {
+    if (process.env.GROUP_MENTIONING_FLAG) {
+      var matches = data.text.match(/@\w+/g);
+      matches.forEach(function (group) {
+        var group = group.substring(1);
+        var stmt = "SELECT members.username, groups.id " +
+          "FROM members JOIN groups ON members.groupid = groups.id WHERE groups.name='" + group.toLowerCase() + "'";
+        db.all(stmt, function (err, rows) {
+          if (rows && rows.length > 0) {
+            console.log(rows);
+            var mentions = "*@" + group.toLowerCase() + ":* ";
+            var first = 1;
+            // Slack requires tagging by user ID
+            // this returns appropriate user ID for each display name
+            request
+              .get('https://slack.com/api/users.list?token=' + process.env.SLACK_TOKEN + '&pretty=1')
+              .then(function (res) {
+                var response = res.body['members'];
+                responseLen = Object.keys(response).length;
+                rows.forEach(function (row) {
+                  var needle = row.username;
+                  if (first) {
+                    for (var i = 0; i < responseLen; i++) {
+                      if (response[i]['profile']['display_name'] === needle) {
+                        mentions += "<@" + response[i]['id'] + ">";
+                        break;
+                      }
+                    }
+                    first = 0;
+                  } else {
+                    for (var i = 0; i < responseLen; i++) {
+                      if (response[i]['profile']['display_name'] === needle) {
+                        mentions += ", <@" + response[i]['id'] + ">";
+                        break;
+                      }
                     }
                   }
-                  first = 0;
-                } else {
-                  for (var i = 0; i < responseLen; i++) {
-                    if (response[i]['profile']['display_name'] === needle) {
-                      mentions += ", <@" + response[i]['id'] + ">";
-                      break;
-                    }
-                  }
-                }
-              })
-              console.log(mentions);
-              slack.sendMsg(data.channel, mentions);
-            });
-        };
+                })
+                console.log(mentions);
+                slack.sendMsg(data.channel, mentions);
+              });
+          };
+        });
       });
-    });
-  } */
+    }
+  }
   else if (text.includes("<!channel>")) {
     var stmt = "SELECT * FROM whitelist WHERE channel='" + data['channel'] + "'";
     db.get(stmt, function (err, row) {
