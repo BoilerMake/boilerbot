@@ -4,14 +4,9 @@ var fs = require("fs");
 var file = "data/local.db";
 var exists = fs.existsSync(file);
 var db = new sqlite3.Database('data/local.db');
-var slackAPI = require('slackbotapi');
 var request = require('superagent');
 var moment = require('moment');
-var slack = new slackAPI({
-  'token': process.env.SLACK_TOKEN,
-  'logging': true,
-  'autoReconnect': true
-});
+const { RTMClient } = require('@slack/rtm-api');
 
 // Helper functions
 function isNumeric(n) {
@@ -37,6 +32,10 @@ function formatStatus(s) {
   return ":question:";
 }
 
+const rtm = new RTMClient(process.env.SLACK_TOKEN);
+rtm.start()
+  .catch(console.error);
+
 db.serialize(function () {
   // If the local.db file doesn't exist, run migrations
   if (!exists) {
@@ -54,18 +53,17 @@ db.serialize(function () {
 });
 
 // On message received
-slack.on('message', function (data) {
+rtm.on('message', function (data) {
   // If no text, return.
   if (typeof data.text === 'undefined') return;
 
   var text = data.text.split(' ');
-  console.log(text);
   if (text[0] === process.env.BOT_NAME || text[0] === process.env.BOT_NAME_SHORT) {
     if (text[1] === 'group' || text[1] === 'g') {
       if (text[2] === 'list') {
         var i = 1;
         db.each("SELECT * FROM groups", function (err, row) {
-          slack.sendMsg(data.channel, '#' + i + ' ' + row.name);
+          rtm.sendMessage('#' + i + ' ' + row.name, data.channel);
           i++;
         });
       }
@@ -74,9 +72,9 @@ slack.on('message', function (data) {
         db.get(stmt, function (err, row) {
           if (typeof row == "undefined") {
             db.prepare("INSERT INTO groups (name) VALUES (?)").run(text[3]).finalize();
-            slack.sendMsg(data.channel, 'Created *' + text[3] + "* group.");
+            rtm.sendMessage('Created *' + text[3] + "* group.", data.channel);
           } else {
-            slack.sendMsg(data.channel, 'Group *' + text[3] + '* already exists.');
+            rtm.sendMessage('Group *' + text[3] + '* already exists.', data.channel);
           }
         });
       }
@@ -86,9 +84,9 @@ slack.on('message', function (data) {
           if (typeof row !== "undefined") {
             db.run("DELETE FROM groups WHERE name='" + text[3] + "'");
             db.run("DELETE FROM members WHERE groupid='" + row.id + "'");
-            slack.sendMsg(data.channel, 'Deleted *' + text[3] + "* group.");
+            rtm.sendMessage('Deleted *' + text[3] + "* group.", data.channel);
           } else {
-            slack.sendMsg(data.channel, 'Group *' + text[3] + '* does not exist.');
+            rtm.sendMessage('Group *' + text[3] + '* does not exist.', data.channel);
           }
         });
       }
@@ -99,19 +97,18 @@ slack.on('message', function (data) {
         db.get(stmt, function (err, row) {
           if (typeof row == "undefined") {
             var getGroup = "SELECT * from groups WHERE groups.name='" + text[3] + "'";
-            console.log(row);
             db.get(getGroup, function (err, row) {
               if (row) {
                 db.prepare("INSERT INTO members (groupid, username) VALUES (?,?)").run(row.id, text[4]).finalize();
-                slack.sendMsg(data.channel, 'Added *' + text[4] + '* to *' + row.name + '*');
+                rtm.sendMessage('Added *' + text[4] + '* to *' + row.name + '*', data.channel);
               }
               else {
-                slack.sendMsg(data.channel, 'This group doesn\'t exist yet. Try using `boilerbot group create <name>`');
+                rtm.sendMessage('This group doesn\'t exist yet. Try using `boilerbot group create <name>`', data.channel);
               }
             });
           }
           else {
-            slack.sendMsg(data.channel, '*' + text[4] + '* already belongs to *' + text[3] + '*');
+            rtm.sendMessage('*' + text[4] + '* already belongs to *' + text[3] + '*', data.channel);
           }
         });
       }
@@ -122,16 +119,15 @@ slack.on('message', function (data) {
         db.get(stmt, function (err, row) {
           if (typeof row !== "undefined") {
             var getGroup = "SELECT * from groups WHERE groups.name='" + text[3] + "'";
-            console.log(row);
             db.get(getGroup, function (err, row) {
               if (row) {
                 db.run("DELETE FROM members WHERE groupid='" + row.id + "' AND username='" + text[4] + "'");
-                slack.sendMsg(data.channel, 'Removed *' + text[4] + '* from *' + text[3] + '*');
+                rtm.sendMessage('Removed *' + text[4] + '* from *' + text[3] + '*', data.channel);
               }
             });
           }
           else {
-            slack.sendMsg(data.channel, '*' + text[4] + '* is not a member of *' + text[3] + '*');
+            rtm.sendMessage('*' + text[4] + '* is not a member of *' + text[3] + '*', data.channel);
           }
         });
       }
@@ -145,10 +141,10 @@ slack.on('message', function (data) {
             rows.forEach(function (row) {
               list += row.name + ", ";
             });
-            slack.sendMsg(data.channel, list.slice(0, -2));
+            rtm.sendMessage(list.slice(0, -2), data.channel);
           }
           else {
-            slack.sendMsg(data.channel, "This user doesn\'t exist or is not in any groups.");
+            rtm.sendMessage("This user doesn\'t exist or is not in any groups.", data.channel);
           }
         });
       }
@@ -156,39 +152,36 @@ slack.on('message', function (data) {
         var stmt = "SELECT members.username, groups.id, groups.name " +
           "FROM members JOIN groups ON members.groupid = groups.id WHERE groups.name='"
           + text[3] + "'";
-        console.log(stmt);
         db.all(stmt, function (err, rows) {
           if (rows && rows.length > 0) {
             var list = "*" + text[3] + "* membership:\n";
             rows.forEach(function (row) {
-              console.log(row);
               list += row.username + "\n";
             });
-            slack.sendMsg(data.channel, list);
+            rtm.sendMessage(list, data.channel);
           }
           else {
-            slack.sendMsg(data.channel, "Could not find group.");
+            rtm.sendMessage("Could not find group.", data.channel);
           }
         });
       }
       else if (text[2] === 'rename' && text[3] !== undefined && text[4] !== undefined) {
         var stmt = "SELECT * FROM groups WHERE name='" + text[3] + "'";
-        console.log(stmt);
         db.get(stmt, function (err, row) {
           if (row) {
             var getSecondary = "SELECT * FROM groups WHERE name='" + text[4] + "'";
             db.get(getSecondary, function (err, row) {
               if (row) {
-                slack.sendMsg(data.channel, "Group *" + text[4] + "* already exists.");
+                rtm.sendMessage("Group *" + text[4] + "* already exists.", data.channel);
               }
               else {
                 db.run("UPDATE groups SET name='" + text[4] + "' WHERE name='" + text[3] + "'");
-                slack.sendMsg(data.channel, "Group *" + text[3] + "* renamed to *" + text[4] + "*");
+                rtm.sendMessage("Group *" + text[3] + "* renamed to *" + text[4] + "*", data.channel);
               }
             });
           }
           else {
-            slack.sendMsg(data.channel, "Group *" + text[3] + "* does not exist.");
+            rtm.sendMessage("Group *" + text[3] + "* does not exist.", data.channel);
           }
         });
       }
@@ -202,7 +195,7 @@ slack.on('message', function (data) {
           "`remove <group> <name>` - remove a member to this group\n" +
           "`info <group>` - list members in this group\n" +
           "`membership <name>` - lists all groups this member is in\n";
-        slack.sendMsg(data.channel, helptext);
+        rtm.sendMessage(helptext, data.channel);
       }
     }
     else if (text[1] === 'task' || text[1] === 't') {
@@ -225,7 +218,7 @@ slack.on('message', function (data) {
             str += ' | ' + row.deadline;
           }
           str += ' | ' + formatCompletion(row.status) + ')';
-          slack.sendMsg(data.channel, str);
+          rtm.sendMessage(str, data.channel);
         });
       }
       else if (text[2] !== undefined && text[3] === "done" && isNumeric(text[4])) {
@@ -235,10 +228,10 @@ slack.on('message', function (data) {
           if (typeof row !== "undefined") {
             if (row.status == 0) {
               db.run("UPDATE task SET status=1 WHERE id='" + text[4] + "'");
-              slack.sendMsg(data.channel, 'Task #' + row.taskid + " has been completed.");
+              rtm.sendMessage('Task #' + row.taskid + " has been completed.", data.channel);
             }
             else {
-              slack.sendMsg(data.channel, 'This task has already been completed.');
+              rtm.sendMessage('This task has already been completed.', data.channel);
             }
           }
         });
@@ -252,10 +245,10 @@ slack.on('message', function (data) {
               str += text[i] + " ";
             }
             db.prepare("INSERT INTO task (groupid, text, status) VALUES (?, ?, 0)").run(row.id, str.slice(0, -1)).finalize();
-            slack.sendMsg(data.channel, 'Task added.');
+            rtm.sendMessage('Task added.', data.channel);
           }
           else {
-            slack.sendMsg(data.channel, 'Couldn\'t find group.');
+            rtm.sendMessage('Couldn\'t find group.', data.channel);
           }
         });
       }
@@ -265,10 +258,10 @@ slack.on('message', function (data) {
         db.get(stmt, function (err, row) {
           if (typeof row !== "undefined") {
             db.run("UPDATE task SET assigned_to='" + text[5] + "' WHERE id='" + text[4] + "'");
-            slack.sendMsg(data.channel, 'Task #' + row.taskid + " has been assigned to *@" + text[5] + "*");
+            rtm.sendMessage('Task #' + row.taskid + " has been assigned to *@" + text[5] + "*", data.channel);
           }
           else {
-            slack.sendMsg(data.channel, 'This task could not be found.');
+            rtm.sendMessage('This task could not be found.', data.channel);
           }
         });
       }
@@ -278,10 +271,10 @@ slack.on('message', function (data) {
         db.get(stmt, function (err, row) {
           if (typeof row !== "undefined") {
             db.run("UPDATE task SET assigned_to=NULL WHERE id='" + text[4] + "'");
-            slack.sendMsg(data.channel, 'Task #' + row.taskid + " has been unassigned");
+            rtm.sendMessage('Task #' + row.taskid + " has been unassigned", data.channel);
           }
           else {
-            slack.sendMsg(data.channel, 'This task could not be found.');
+            rtm.sendMessage('This task could not be found.', data.channel);
           }
         });
       }
@@ -291,10 +284,10 @@ slack.on('message', function (data) {
         db.get(stmt, function (err, row) {
           if (typeof row !== "undefined") {
             db.run("DELETE FROM task WHERE id='" + text[4] + "'");
-            slack.sendMsg(data.channel, 'Task #' + row.taskid + " has been deleted");
+            rtm.sendMessage('Task #' + row.taskid + " has been deleted", data.channel);
           }
           else {
-            slack.sendMsg(data.channel, 'This task could not be found.');
+            rtm.sendMessage('This task could not be found.', data.channel);
           }
         });
       }
@@ -307,14 +300,14 @@ slack.on('message', function (data) {
           if (typeof row !== "undefined") {
             if (moment(text[5], "MM/DD/YYYY", true).isValid()) {
               db.run("UPDATE task SET deadline='" + text[5] + "' WHERE id='" + text[4] + "'");
-              slack.sendMsg(data.channel, 'Task #' + row.taskid + " now has deadline *" + text[5] + "*");
+              rtm.sendMessage('Task #' + row.taskid + " now has deadline *" + text[5] + "*", data.channel);
             }
             else {
-              slack.sendMsg(data.channel, 'Bad date format');
+              rtm.sendMessage('Bad date format', data.channel);
             }
           }
           else {
-            slack.sendMsg(data.channel, 'This task could not be found.');
+            rtm.sendMessage('This task could not be found.', data.channel);
           }
         });
       }
@@ -328,7 +321,7 @@ slack.on('message', function (data) {
           "`<group> unassign <taskid>` - Remove name from task with <taskid>\n" +
           "`<group> date <taskid> <MM/DD/YYYY>` - Add deadline on <MM/DD/YYYY> to task <taskid>\n" +
           "`<group> delete <taskid>` - Delete task with <taskid>\n";
-        slack.sendMsg(data.channel, helptext);
+        rtm.sendMessage(helptext, data.channel);
       }
     }
     else if (text[1] === 'status') {
@@ -346,7 +339,7 @@ slack.on('message', function (data) {
               str += formatStatus(entry.Status) + " *" + entry.WebsiteName + "*  uptime: " + entry.Uptime + "%\n";
               console.log(entry.TestID);
             });
-            slack.sendMsg(data.channel, str);
+            rtm.sendMessage(str, data.channel);
           }
         });
     }
@@ -354,7 +347,7 @@ slack.on('message', function (data) {
       var helptext = "All commands begin with `" + process.env.BOT_NAME + " or " + process.env.BOT_NAME_SHORT + "`\n" +
         "`group help` - list group help\n" +
         "`task help` - list task help\n";
-      slack.sendMsg(data.channel, helptext);
+      rtm.sendMessage(helptext, data.channel);
     }
     else if (text[1] === 'whitelist') {
       if (text[2] === 'add') {
@@ -362,9 +355,9 @@ slack.on('message', function (data) {
         db.get(stmt, function (err, row) {
           if (typeof row == "undefined") {
             db.prepare("INSERT INTO whitelist (channel) VALUES (?)").run(data['channel']).finalize();
-            slack.sendMsg(data.channel, 'Whitelisted channel');
+            rtm.sendMessage('Whitelisted channel', data.channel);
           } else {
-            slack.sendMsg(data.channel, 'Already whitelisted');
+            rtm.sendMessage('Already whitelisted', data.channel);
           }
         });
       } else if (text[2] === 'remove') {
@@ -372,9 +365,9 @@ slack.on('message', function (data) {
         db.get(stmt, function (err, row) {
           if (typeof row !== "undefined") {
             db.run("DELETE FROM whitelist WHERE channel='" + data['channel'] + "'");
-            slack.sendMsg(data.channel, 'Removed channel from whitelist');
+            rtm.sendMessage('Removed channel from whitelist', data.channel);
           } else {
-            slack.sendMsg(data.channel, 'Channel not whitelisted');
+            rtm.sendMessage('Channel not whitelisted', data.channel);
           }
         });
       }
@@ -390,38 +383,8 @@ slack.on('message', function (data) {
           "FROM members JOIN groups ON members.groupid = groups.id WHERE groups.name='" + group.toLowerCase() + "'";
         db.all(stmt, function (err, rows) {
           if (rows && rows.length > 0) {
-            console.log(rows);
-            var mentions = "*@" + group.toLowerCase() + ":* ";
-            var first = 1;
-            // Slack requires tagging by user ID
-            // this returns appropriate user ID for each display name
-            request
-              .get('https://slack.com/api/users.list?token=' + process.env.SLACK_TOKEN + '&pretty=1')
-              .then(function (res) {
-                var response = res.body['members'];
-                responseLen = Object.keys(response).length;
-                rows.forEach(function (row) {
-                  var needle = row.username;
-                  if (first) {
-                    for (var i = 0; i < responseLen; i++) {
-                      if (response[i]['profile']['display_name'] === needle) {
-                        mentions += "<@" + response[i]['id'] + ">";
-                        break;
-                      }
-                    }
-                    first = 0;
-                  } else {
-                    for (var i = 0; i < responseLen; i++) {
-                      if (response[i]['profile']['display_name'] === needle) {
-                        mentions += ", <@" + response[i]['id'] + ">";
-                        break;
-                      }
-                    }
-                  }
-                })
-                console.log(mentions);
-                slack.sendMsg(data.channel, mentions);
-              });
+            const mentions = "*@" + group.toLowerCase() + ":*\n" + rows.map(member => member.username).join(', ');
+            rtm.sendMessage(mentions, data.channel);
           };
         });
       });
@@ -431,7 +394,7 @@ slack.on('message', function (data) {
     var stmt = "SELECT * FROM whitelist WHERE channel='" + data['channel'] + "'";
     db.get(stmt, function (err, row) {
       if (typeof row == "undefined") {
-        slack.sendMsg(data.channel, 'Please use group mentioning instead, `bb group list`');
+        rtm.sendMessage('Please use group mentioning instead, `bb group list`', data.channel);
       }
     });
   }
